@@ -27,7 +27,7 @@ const ChatPage = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
@@ -42,6 +42,49 @@ const ChatPage = () => {
         setCurrentUser(null);
       }
     }
+  }, []);
+
+  // Load conversation history for logged-in user
+  useEffect(() => {
+    const loadHistory = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/ask/history`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (!resp.ok) {
+          console.warn("Failed to load history", resp.status);
+          return;
+        }
+        const payload = await resp.json();
+        const convs = payload.conversations || [];
+
+        if (convs.length === 0) return;
+
+        // map conversations to chat structure used by ChatPage
+        const mapped = convs.map((c, idx) => ({
+          id: c._id || `${Date.now()}-${idx}`,
+          name: new Date(c.createdAt).toLocaleString(),
+          messages: [
+            { sender: "user", text: c.question, timestamp: new Date(c.createdAt) },
+            { sender: "ai", text: c.answer, timestamp: new Date(c.createdAt) }
+          ],
+          createdAt: new Date(c.createdAt)
+        }));
+
+        setChats(mapped);
+        setActiveChat(mapped[0].id);
+      } catch (err) {
+        console.error("Error loading history:", err);
+      }
+    };
+
+    loadHistory();
   }, []);
 
   // Auto-scroll to bottom when new messages arrive
